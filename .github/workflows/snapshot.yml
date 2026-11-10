@@ -31,5 +31,10 @@ jobs:
           git add -A data
           if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
           git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%M)"
-          git pull --rebase
-          git push
+          # Another run may have pushed the same hour meanwhile: keep the version already on origin
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X ours origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep 15
+          done
+          echo "push failed after retries"; exit 1
