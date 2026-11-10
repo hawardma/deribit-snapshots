@@ -2,8 +2,9 @@ name: Deribit hourly snapshot
 
 on:
   schedule:
-    - cron: "35 * * * *"   # UTC; the script then waits until the next top-of-hour
-  workflow_dispatch:        # manual run (for testing)
+    - cron: "5 * * * *"    # UTC. GitHub often starts 30-60 min late; the script backfills the
+    - cron: "35 * * * *"   #   hour already begun (flagged late) and then waits for the next top of hour
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,13 +16,13 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Wait for top of hour and fetch
+      - name: Fetch snapshots
         run: python snapshot.py
       - name: Commit
         run: |
