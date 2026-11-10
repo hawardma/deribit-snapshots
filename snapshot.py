@@ -20,18 +20,19 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 def now():
     return datetime.now(timezone.utc)
 
-def fetch(cur, kind):
+def fetch(cur, kind, tries=8):
     url = f"{BASE}?currency={cur}&kind={kind}"
-    for k in range(1, 6):
+    for k in range(1, tries + 1):
         try:
-            with urllib.request.urlopen(url, timeout=30) as r:
+            req = urllib.request.Request(url, headers={"User-Agent": "deribit-snapshots/1.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
                 b = r.read()
             if len(b) < 1000:
                 raise ValueError("response too small")
             return b
         except Exception as e:  # noqa: BLE001
             print(f"  {cur} {kind} attempt {k} failed: {e}", flush=True)
-            time.sleep(5 * k)
+            time.sleep(min(60, 5 * k))
     raise RuntimeError(f"{cur} {kind}: all attempts failed")
 
 def capture(tgt, t0):
@@ -65,8 +66,12 @@ def main():
     this_hour = t0.replace(minute=0, second=0, microsecond=0)
     next_hour = this_hour + timedelta(hours=1)
     print(f"triggered {t0.isoformat()}", flush=True)
-    # 1. backfill the hour already begun (flagged late) if nobody captured it
-    capture(this_hour, t0)
+    # 1. backfill the hour already begun (flagged late) if nobody captured it;
+    #    a failure here (e.g. Deribit 503) must not stop the on-time capture below
+    try:
+        capture(this_hour, t0)
+    except Exception as e:  # noqa: BLE001
+        print(f"backfill of {this_hour.isoformat()} failed: {e}", flush=True)
     # 2. wait for the next top of hour and capture it on time
     wait = (next_hour - now()).total_seconds()
     if 0 < wait <= MAX_WAIT:
