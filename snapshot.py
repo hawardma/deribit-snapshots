@@ -8,7 +8,7 @@ GitHub's scheduler is often 30-60 min late, so each run does two things:
 Both are skipped if that hour's meta.json already exists (another run got it).
 Files: data/YYYY-MM-DD/HH_<CUR>_<kind>.json.gz + HH_meta.json; late ones also in data/late.log.
 """
-import gzip, json, os, time, urllib.request
+import gzip, json, os, sys, time, urllib.request
 from datetime import datetime, timezone, timedelta
 
 BASE = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency"
@@ -63,6 +63,7 @@ def capture(tgt, t0):
 
 def main():
     t0 = now()
+    failed = False
     this_hour = t0.replace(minute=0, second=0, microsecond=0)
     next_hour = this_hour + timedelta(hours=1)
     print(f"triggered {t0.isoformat()}", flush=True)
@@ -77,8 +78,26 @@ def main():
     if 0 < wait <= MAX_WAIT:
         print(f"waiting {wait:.0f}s for {next_hour.isoformat()}", flush=True)
         time.sleep(wait)
-        capture(next_hour, t0)
+        # Deribit may be down at the top of the hour (503): keep trying for 15 min; a late
+        # capture is flagged by capture() itself. If it never works, record it and fail the run
+        # (the workflow still commits whatever was captured).
+        deadline = next_hour + timedelta(minutes=15)
+        while True:
+            try:
+                capture(next_hour, t0)
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"capture of {next_hour.isoformat()} failed: {e}", flush=True)
+                if now() > deadline:
+                    os.makedirs(ROOT, exist_ok=True)
+                    with open(os.path.join(ROOT, "failed.log"), "a") as f:
+                        f.write(f"{next_hour.isoformat()} not captured: {e}\n")
+                    failed = True
+                    break
+                time.sleep(30)
     print("done", flush=True)
+    if failed:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
