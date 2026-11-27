@@ -1,0 +1,15 @@
+{
+ "target_utc": "2026-11-27T09:00:00+00:00",
+ "trigger_utc": "2026-11-27T08:00:13.559162+00:00",
+ "fetch_start_utc": "2026-11-27T09:00:00.000284+00:00",
+ "fetch_end_utc": "2026-11-27T09:00:00.908479+00:00",
+ "late_seconds": 0.0,
+ "late": false,
+ "files": {
+  "09_BTC_option.json.gz": 516119,
+  "09_BTC_future.json.gz": 8107,
+  "09_ETH_option.json.gz": 402574,
+  "09_ETH_future.json.gz": 8010
+ },
+ "source": "github-actions"
+}
